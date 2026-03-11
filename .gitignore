@@ -1,0 +1,6 @@
+node_modules/
+*.log
+polymarket_*.json
+polymarket_*.txt
+.env
+.DS_Store

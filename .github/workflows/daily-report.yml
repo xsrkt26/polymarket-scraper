@@ -1,0 +1,81 @@
+name: Polymarket Daily Report
+
+on:
+  schedule:
+    # 每天北京时间 9:30 (UTC 1:30)
+    - cron: '30 1 * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  scrape-and-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Run scraper
+        id: scrape
+        run: |
+          node polymarket_api.js > output.log 2>&1
+          cat output.log
+        continue-on-error: true
+      
+      - name: Send to WeCom
+        if: always()
+        env:
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        run: |
+          # 检查报告文件是否生成
+          REPORT_FILE=$(ls -t polymarket_report_*.txt 2>/dev/null | head -1)
+          
+          if [ -n "$REPORT_FILE" ]; then
+            echo "找到报告: $REPORT_FILE"
+            
+            # 读取报告内容
+            REPORT_CONTENT=$(cat "$REPORT_FILE")
+            
+            # 发送到企业微信
+            curl -X POST "$WECOM_WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"msgtype\": \"markdown\",
+                \"markdown\": {
+                  \"content\": $(echo "$REPORT_CONTENT" | jq -Rs .)
+                }
+              }"
+            
+            echo "✅ 报告已发送到企业微信"
+          else
+            echo "⚠️ 未找到报告文件,发送错误通知"
+            
+            ERROR_LOG=$(tail -50 output.log | sed 's/"/\\"/g' | tr '\n' ' ')
+            
+            curl -X POST "$WECOM_WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"msgtype\": \"text\",
+                \"text\": {
+                  \"content\": \"⚠️ Polymarket 数据获取失败\n\n错误信息:\n$ERROR_LOG\"
+                }
+              }"
+          fi
+      
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: polymarket-report-${{ github.run_number }}
+          path: |
+            polymarket_*.json
+            polymarket_*.txt
+            output.log
+          retention-days: 7

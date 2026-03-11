@@ -1,0 +1,14 @@
+{
+  "name": "polymarket-daily-scraper",
+  "version": "1.0.0",
+  "description": "Polymarket 市场数据每日抓取器",
+  "main": "polymarket_api.js",
+  "scripts": {
+    "start": "node polymarket_api.js",
+    "test": "node polymarket_api.js"
+  },
+  "keywords": ["polymarket", "crypto", "prediction-market"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}
